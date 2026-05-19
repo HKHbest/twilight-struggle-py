@@ -690,6 +690,28 @@ class TestEarlyWarCards:
         # Opponent (US) should be the one choosing
         assert game.input_state.side == Side.US
 
+    def test_olympic_games_participation_uses_modified_sponsor_roll(self):
+        game = make_game()
+        game.cards['Olympic_Games'].use_event(game, Side.USSR)
+        assert game.input_state.recv(
+            'Participate and sponsor has modified die roll (+2).') is True
+        game.stage_complete()
+        assert (3, 2) in set(game.input_state.available_options)
+        assert game.input_state.recv((3, 2)) is True
+        assert game.vp_track == 2
+
+    def test_olympic_games_participation_excludes_modified_ties(self):
+        game = make_game()
+        game.cards['Olympic_Games'].use_event(game, Side.US)
+        assert game.input_state.recv(
+            'Participate and sponsor has modified die roll (+2).') is True
+        game.stage_complete()
+        available = set(game.input_state.available_options)
+        assert (3, 3) not in available
+        assert (4, 4) not in available
+        assert (6, 6) not in available
+        assert (8, 6) in available
+
     def test_nato_requires_prerequisite(self):
         """NATO requires Warsaw Pact or Marshall Plan in basket."""
         game = make_game()
