@@ -1,4 +1,5 @@
 import math
+import random
 
 from typing import Callable, Optional
 from functools import partial
@@ -2409,6 +2410,7 @@ class Our_Man_In_Tehran(Card):
 
     def return_remaining_cards(self, game_instance):
         returned_cards = list(game_instance.hand[Side.NEUTRAL])
+        random.shuffle(returned_cards)
         game_instance.draw_pile.extend(reversed(returned_cards))
         if game_instance.players[Side.US] is not None:
             game_instance.players[Side.US].update_draw_pile(returned_cards)
