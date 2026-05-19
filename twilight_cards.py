@@ -373,6 +373,7 @@ class Vietnam_Revolts(Card):
     def reset(self):
         self.all_points_in_region = True
         self.extra_point_given = False
+        self.extra_point_taken = False
 
     def give_rep(self, game_instance, name, repetitions):
         '''
@@ -422,7 +423,7 @@ class Vietnam_Revolts(Card):
 
         elif game_instance.input_state.reps == 2 and self.all_points_in_region:
             for n in game_instance.input_state.selection:
-                if game_instance.map[n].info.name not in Vietnam_Revolts._region or game_instance.map[n].control == side.opp:
+                if game_instance.map[n].info.name not in Vietnam_Revolts._region and game_instance.map[n].control == side.opp:
                     game_instance.input_state.remove_option(n)
 
         elif game_instance.input_state.reps == 1 and self.all_points_in_region:

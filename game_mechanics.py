@@ -704,8 +704,7 @@ class Game:
                 self, name, self.input_state.reps)
             self.cards['The_China_Card'].modify_selection(self, side)
 
-        # and side == Side.USSR:
-        if 'Vietnam_Revolts' in self.basket[Side.USSR]:
+        if 'Vietnam_Revolts' in self.basket[Side.USSR] and side == Side.USSR:
             self.input_state.reps = self.cards['Vietnam_Revolts'].give_rep(
                 self, name, self.input_state.reps)
             self.input_state.reps = self.cards['Vietnam_Revolts'].remove_rep(
@@ -775,7 +774,7 @@ class Game:
                 self.stage_list.append(
                     partial(self.card_operation_realignment, side, card_name=card_name, reps=reps,
                             restricted_list=self.cards['The_China_Card']._region))
-            elif 'Vietnam_Revolts' in self.basket[Side.USSR] and reps == 1 and self.cards['Vietnam_Revolts'].all_points_in_region:
+            elif 'Vietnam_Revolts' in self.basket[Side.USSR] and side == Side.USSR and reps == 1 and self.cards['Vietnam_Revolts'].all_points_in_region:
                 self.stage_list.append(
                     partial(self.card_operation_realignment, side, card_name=card_name, reps=reps,
                             restricted_list=self.cards['Vietnam_Revolts']._region))

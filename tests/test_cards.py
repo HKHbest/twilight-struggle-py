@@ -408,6 +408,17 @@ class TestEarlyWarCards:
         assert game.input_state.complete is True
         assert game.map['North_Korea'].influence[Side.USSR] == before + 4
 
+    def test_china_card_four_asia_placements_force_final_asia(self):
+        game = make_game()
+        game.card_operation_influence(Side.USSR, 'The_China_Card')
+        for _ in range(4):
+            assert game.input_state.recv('North_Korea') is True
+        available = set(game.input_state.available_options)
+        assert game.input_state.reps == 1
+        assert available
+        assert all(n in CountryInfo.REGION_ALL[MapRegion.ASIA] for n in available)
+        assert 'Finland' not in available
+
     def test_china_card_us_play_removes_formosan_resolution(self):
         game = make_game()
         game.hand[Side.US] = ['The_China_Card']
@@ -455,6 +466,74 @@ class TestEarlyWarCards:
         game.cards['Vietnam_Revolts'].use_event(game, Side.USSR)
         assert game.map['Vietnam'].influence[Side.USSR] == 2
         assert 'Vietnam_Revolts' in game.basket[Side.USSR]
+
+    def test_vietnam_revolts_reset_clears_extra_point_state(self):
+        game = make_game()
+        card = game.cards['Vietnam_Revolts']
+        card.all_points_in_region = False
+        card.extra_point_given = True
+        card.extra_point_taken = True
+        card.reset()
+        assert card.all_points_in_region is True
+        assert card.extra_point_given is False
+        assert card.extra_point_taken is False
+
+    def test_vietnam_revolts_influence_bonus_applies_only_to_ussr(self):
+        game = make_game()
+        game.cards['Vietnam_Revolts'].use_event(game, Side.USSR)
+        game.card_operation_influence(Side.US, 'Duck_and_Cover')
+        before = game.map['Philippines'].influence[Side.US]
+        for _ in range(3):
+            assert game.input_state.recv('Philippines') is True
+        assert game.input_state.complete is True
+        assert game.input_state.recv('Philippines') is False
+        assert game.map['Philippines'].influence[Side.US] == before + 3
+
+    def test_vietnam_revolts_ussr_influence_gets_bonus_in_southeast_asia(self):
+        game = make_game()
+        game.cards['Vietnam_Revolts'].use_event(game, Side.USSR)
+        game.card_operation_influence(Side.USSR, 'Duck_and_Cover')
+        before = game.map['Vietnam'].influence[Side.USSR]
+        for _ in range(4):
+            assert game.input_state.recv('Vietnam') is True
+        assert game.input_state.complete is True
+        assert game.map['Vietnam'].influence[Side.USSR] == before + 4
+
+    def test_vietnam_revolts_three_sea_placements_force_final_sea(self):
+        game = make_game()
+        game.cards['Vietnam_Revolts'].use_event(game, Side.USSR)
+        game.card_operation_influence(Side.USSR, 'Duck_and_Cover')
+        for _ in range(3):
+            assert game.input_state.recv('Vietnam') is True
+        available = set(game.input_state.available_options)
+        assert game.input_state.reps == 1
+        assert available
+        assert all(n in CountryInfo.REGION_ALL[MapRegion.SOUTHEAST_ASIA] for n in available)
+        assert 'Afghanistan' not in available
+
+    def test_vietnam_revolts_can_skip_bonus_before_final_point(self):
+        game = make_game()
+        game.cards['Vietnam_Revolts'].use_event(game, Side.USSR)
+        game.card_operation_influence(Side.USSR, 'Duck_and_Cover')
+        assert game.input_state.recv('Vietnam') is True
+        assert game.input_state.recv('Vietnam') is True
+        assert game.input_state.reps == 2
+        assert 'Afghanistan' in set(game.input_state.available_options)
+        before = game.map['Afghanistan'].influence[Side.USSR]
+        assert game.input_state.recv('Afghanistan') is True
+        assert game.input_state.complete is True
+        assert game.map['Afghanistan'].influence[Side.USSR] == before + 1
+
+    def test_vietnam_revolts_does_not_restrict_us_realignment(self):
+        game = make_game()
+        game.cards['Vietnam_Revolts'].use_event(game, Side.USSR)
+        game.card_operation_realignment(Side.US, 'Duck_and_Cover')
+        for _ in range(2):
+            assert game.input_state.recv('East_Germany') is True
+            game.stage_complete()
+            assert game.input_state.recv((1, 1)) is True
+            game.stage_complete()
+        assert 'East_Germany' in set(game.input_state.available_options)
 
     def test_blockade_creates_discard_option(self):
         """US must discard 3+ ops card or lose all influence in West Germany."""
