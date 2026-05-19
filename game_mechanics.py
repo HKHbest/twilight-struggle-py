@@ -31,6 +31,7 @@ class Game:
     def __init__(self):
 
         self.terminated = False
+        self.winner = None
         self.vp_track = 0
         self.turn_track = 0
         self.ar_track = 0
@@ -66,6 +67,7 @@ class Game:
 
         self.started = True
         self.terminated = False
+        self.winner = None
         self.vp_track = 0  # positive for ussr
         self.turn_track = 1
         self.ar_track = 0
@@ -111,10 +113,10 @@ class Game:
         self.stage_list.clear()
         self.terminated = True
         if side != Side.NEUTRAL:
-            winner = side.toStr()
+            self.winner = side
         else:
-            winner = 'USSR' if self.vp_track > 0 else 'US'
-        print(f'{winner} victory!')
+            self.winner = Side.USSR if self.vp_track > 0 else Side.US
+        print(f'{self.winner.toStr()} victory!')
 
     '''Here are functions used to manipulate the various tracks.'''
 
@@ -158,7 +160,7 @@ class Game:
             self.terminate()
         print(f'Current VP: {self.vp_track}')
 
-    def change_defcon(self, n: int):
+    def change_defcon(self, n: int, defcon_loser: Side = None):
         '''
         Changes the current DEFCON level. Keeps DEFCON level between 1-5.
         If DEFCON level goes below 2, the game ends.
@@ -172,7 +174,7 @@ class Game:
         self.defcon_track += min(n, 5 - self.defcon_track)
         if self.defcon_track < 2:
             print('Game ended by thermonuclear war')
-            self.terminate()
+            self.terminate(defcon_loser.opp if defcon_loser is not None else Side.NEUTRAL)
         if previous_defcon > 2 and self.defcon_track == 2 and self.ar_track != 0 and 'NORAD' in self.basket[Side.US]:
             self.cards['NORAD'].place_norad_influence(self)
 
@@ -512,17 +514,20 @@ class Game:
         return True
 
     def action_callback(self, side: Side, card_name: str, action_name: str,
-                        no_event: bool = False, un_intervention: bool = False):
+                        no_event: bool = False, un_intervention: bool = False,
+                        defcon_loser: Side = None):
         self.input_state.reps -= 1
         self.stage_list.append(
             partial(self.resolve_card_action, side,
                     card_name, action_name, no_event=no_event,
-                    un_intervention=un_intervention)
+                    un_intervention=un_intervention,
+                    defcon_loser=defcon_loser)
         )
         return True
 
     def select_action(self, side: Side, card_name: str, is_event_resolved: bool = False,
-                      un_intervention: bool = False, can_coup=True, free_coup_realignment=False):
+                      un_intervention: bool = False, can_coup=True, free_coup_realignment=False,
+                      defcon_loser: Side = None):
         '''
         Stage where the player has already chosen a card and now chooses an action to do with the card.
         Checks are made to ensure that the actions made available to the player are feasible actions,
@@ -558,13 +563,15 @@ class Game:
             side, InputType.SELECT_CARD_ACTION,
             partial(self.action_callback, side, card_name,
                     no_event=is_event_resolved,
-                    un_intervention=un_intervention),
+                    un_intervention=un_intervention,
+                    defcon_loser=defcon_loser),
             (CardAction(i).name for i, b in enumerate(bool_arr) if b),
             prompt=f'Select an action for {card_name}.'
         )
 
     def resolve_card_action(self, side: Side, card_name: str, action_name: str,
-                            no_event: bool = False, un_intervention: bool = False):
+                            no_event: bool = False, un_intervention: bool = False,
+                            defcon_loser: Side = None):
         '''
         This function should lead to card_operation_realignment, card_operation_coup,
         or card_operation_influence, or a space race function.
@@ -627,7 +634,8 @@ class Game:
                 self.stage_list.append(
                     partial(self.trigger_event, side, card_name))
             self.stage_list.append(
-                partial(self.card_operation_coup, side, card_name))
+                partial(self.card_operation_coup, side, card_name,
+                        defcon_loser=defcon_loser))
 
         if 'Flower_Power' in self.basket[Side.USSR]:
             if action in [CardAction.PLAY_EVENT, CardAction.INFLUENCE, CardAction.REALIGNMENT, CardAction.COUP]:
@@ -845,7 +853,8 @@ class Game:
             prompt=prompt,
         )
 
-    def coup_dice_callback(self, name, side, ops, free, num: str, che=False):
+    def coup_dice_callback(self, name, side, ops, free, num: str, che=False,
+                           defcon_loser: Side = None):
         self.input_state.reps -= 1
 
         if che:
@@ -854,7 +863,8 @@ class Game:
                              CountryInfo.REGION_ALL[MapRegion.SOUTH_AMERICA],
                              CountryInfo.REGION_ALL[MapRegion.AFRICA])
 
-        self.map.coup(self, name, side, ops, int(num), free=free)
+        self.map.coup(self, name, side, ops, int(num), free=free,
+                      defcon_loser=defcon_loser)
 
         if che and self.map[name].influence[Side.US] < before_us_inf:
             print('You are allowed a second coup from Che.')
@@ -863,7 +873,8 @@ class Game:
 
         return True
 
-    def coup_callback(self, side: Side, effective_ops: int, card_name: str, name: str, free=False, che=False) -> bool:
+    def coup_callback(self, side: Side, effective_ops: int, card_name: str, name: str,
+                      free=False, che=False, defcon_loser: Side = None) -> bool:
         self.input_state.reps -= 1
 
         local_ops_modifier = 0
@@ -875,11 +886,13 @@ class Game:
         self.stage_list.append(partial(
             self.dice_stage,
             partial(self.coup_dice_callback, name, side,
-                    effective_ops + local_ops_modifier, free, che=che)))
+                    effective_ops + local_ops_modifier, free, che=che,
+                    defcon_loser=defcon_loser)))
 
         return True
 
-    def card_operation_coup(self, side: Side, card_name: str, restricted_list: Sequence[str] = None, free=False, che=False):
+    def card_operation_coup(self, side: Side, card_name: str, restricted_list: Sequence[str] = None,
+                            free=False, che=False, defcon_loser: Side = None):
         '''
         Stage when a player is given the opportunity to coup. Provides a list
         of countries which can be couped and waits for player input.
@@ -896,6 +909,8 @@ class Game:
             for cards like Junta, Che, Ortega where there are further restrictions.
         '''
         card = self.cards[card_name]
+        if defcon_loser is None:
+            defcon_loser = side
         effective_ops = self.get_global_effective_ops(
             side, card.info.ops)
         if restricted_list is None:
@@ -909,7 +924,8 @@ class Game:
             self.input_state = Input(
                 side, InputType.SELECT_COUNTRY,
                 partial(self.coup_callback, side,
-                        effective_ops, card_name, che=che),
+                        effective_ops, card_name, che=che,
+                        defcon_loser=defcon_loser),
                 (n for n in CountryInfo.ALL
                     if self.map.can_coup(self, n, side) and n in restricted_list),
                 prompt=f'Select a country to coup using operations from {card_name}.')

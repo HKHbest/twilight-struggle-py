@@ -945,6 +945,112 @@ class TestMidWarCards:
         assert game.defcon_track == 2
         assert 'Cuban_Missile_Crisis' in game.basket[Side.USSR]
 
+    def test_cuban_missile_crisis_us_coup_loses_to_ussr(self):
+        game = make_game()
+        game.cards['Cuban_Missile_Crisis'].use_event(game, Side.USSR)
+        game.map['Cuba'].set_influence(3, 0)
+        game.map.coup(game, 'Cuba', Side.US, 3, 6)
+        assert game.terminated is True
+        assert game.winner == Side.USSR
+        assert game.defcon_track == 1
+        assert game.map['Cuba'].influence[Side.USSR] == 3
+        assert game.milops_track[Side.US] == 0
+
+    def test_cuban_missile_crisis_ussr_coup_loses_to_us(self):
+        game = make_game()
+        game.cards['Cuban_Missile_Crisis'].use_event(game, Side.US)
+        game.map['Cuba'].set_influence(0, 3)
+        game.map.coup(game, 'Cuba', Side.USSR, 3, 6)
+        assert game.terminated is True
+        assert game.winner == Side.US
+        assert game.defcon_track == 1
+        assert game.map['Cuba'].influence[Side.US] == 3
+        assert game.milops_track[Side.USSR] == 0
+
+    def test_cuban_missile_crisis_overrides_nuclear_subs(self):
+        game = make_game()
+        game.cards['Cuban_Missile_Crisis'].use_event(game, Side.USSR)
+        game.cards['Nuclear_Subs'].use_event(game, Side.US)
+        game.map['Cuba'].set_influence(3, 0)
+        game.map.coup(game, 'Cuba', Side.US, 3, 6)
+        assert game.terminated is True
+        assert game.winner == Side.USSR
+        assert game.defcon_track == 1
+
+    def test_cuban_missile_crisis_cia_coup_loses_for_ussr_player(self):
+        game = make_game()
+        mock_pv = type('MockPV', (), {'update_opp_hand': lambda self, x: None})()
+        game.players = [mock_pv, mock_pv]
+        game.cards['Cuban_Missile_Crisis'].use_event(game, Side.USSR)
+        game.map['West_Germany'].set_influence(0, 0)
+        game.map['Turkey'].set_influence(0, 0)
+        game.map['Cuba'].set_influence(3, 0)
+        game.cards['CIA_Created'].use_event(game, Side.USSR)
+        assert game.input_state.recv('COUP') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('Cuba') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('6') is True
+        assert game.terminated is True
+        assert game.winner == Side.US
+
+    def test_cuban_missile_crisis_lone_gunman_coup_loses_for_us_player(self):
+        game = make_game()
+        mock_pv = type('MockPV', (), {'update_opp_hand': lambda self, x: None})()
+        game.players = [mock_pv, mock_pv]
+        game.cards['Cuban_Missile_Crisis'].use_event(game, Side.US)
+        game.map['Cuba'].set_influence(0, 3)
+        game.cards['Lone_Gunman'].use_event(game, Side.US)
+        assert game.input_state.recv('COUP') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('Cuba') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('6') is True
+        assert game.terminated is True
+        assert game.winner == Side.USSR
+
+    def test_cia_coup_defcon_loss_charges_ussr_player(self):
+        game = make_game()
+        mock_pv = type('MockPV', (), {'update_opp_hand': lambda self, x: None})()
+        game.players = [mock_pv, mock_pv]
+        game.defcon_track = 2
+        game.map['Cuba'].set_influence(3, 0)
+        game.cards['CIA_Created'].use_event(game, Side.USSR)
+        assert game.input_state.recv('COUP') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('Cuba') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('6') is True
+        assert game.terminated is True
+        assert game.winner == Side.US
+
+    def test_lone_gunman_coup_defcon_loss_charges_us_player(self):
+        game = make_game()
+        mock_pv = type('MockPV', (), {'update_opp_hand': lambda self, x: None})()
+        game.players = [mock_pv, mock_pv]
+        game.defcon_track = 2
+        game.map['Cuba'].set_influence(0, 3)
+        game.cards['Lone_Gunman'].use_event(game, Side.US)
+        assert game.input_state.recv('COUP') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('Cuba') is True
+        resolve_pending_stages(game)
+        assert game.input_state.recv('6') is True
+        assert game.terminated is True
+        assert game.winner == Side.USSR
+
+    def test_cuban_missile_crisis_can_be_cancelled_by_removing_influence(self):
+        game = make_game()
+        game.cards['Cuban_Missile_Crisis'].use_event(game, Side.USSR)
+        game.map['West_Germany'].set_influence(0, 4)
+        game.cards['Cuban_Missile_Crisis'].cuban_missile_remove(game, Side.US)
+        assert game.input_state.side == Side.US
+        assert game.input_state.recv('West_Germany') is True
+        assert 'Cuban_Missile_Crisis' not in game.basket[Side.USSR]
+        assert game.map['West_Germany'].influence[Side.US] == 2
+        game.end_turn_stage_list[0]()
+        assert 'Cuban_Missile_Crisis' not in game.basket[Side.USSR]
+
     def test_nuclear_subs(self):
         """US coups in BG don't affect DEFCON."""
         game = make_game()

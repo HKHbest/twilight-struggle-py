@@ -123,7 +123,8 @@ class GameMap:
         return not (side == Side.US and country.influence[Side.USSR] == 0 or
                     side == Side.USSR and country.influence[Side.US] == 0)
 
-    def coup(self, game_instance, name: str, side: Side, effective_ops: int, die_roll: int, free=False):
+    def coup(self, game_instance, name: str, side: Side, effective_ops: int, die_roll: int, free=False,
+             defcon_loser: Side = None):
         '''
         The result of a given side couping in a country, with a die_roll provided.
         Accounts for:
@@ -152,6 +153,14 @@ class GameMap:
         '''
         assert(self.can_coup(game_instance, name, side))
         country = self[name]
+        if defcon_loser is None:
+            defcon_loser = side
+
+        if 'Cuban_Missile_Crisis' in game_instance.basket[side.opp]:
+            print('Game ended by Cuban Missile Crisis')
+            game_instance.change_defcon(
+                1 - game_instance.defcon_track, defcon_loser=defcon_loser)
+            return
 
         ussr_advantage = 0
 
@@ -183,15 +192,12 @@ class GameMap:
         print(
             f'Coup {outcome} with roll of {die_roll}. Difference: {difference}')
 
-        # Cuban Missile Crisis overrides Nuclear Subs
-        if 'Cuban_Missile_Crisis' in game_instance.basket[side.opp]:
-            game_instance.change_defcon(1-game_instance.defcon_track)
-        elif country.info.battleground:
+        if country.info.battleground:
             if side == Side.US:
                 if 'Nuclear_Subs' not in game_instance.basket[Side.US]:
-                    game_instance.change_defcon(-1)
+                    game_instance.change_defcon(-1, defcon_loser=defcon_loser)
             else:
-                game_instance.change_defcon(-1)
+                game_instance.change_defcon(-1, defcon_loser=defcon_loser)
 
         # Yuri and Samantha
         if side == Side.US and 'Yuri_and_Samantha' in game_instance.basket[Side.USSR]:

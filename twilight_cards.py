@@ -826,7 +826,8 @@ class CIA_Created(Card):
             game_instance.hand[Side.USSR])
         self.event_occurred = True
         game_instance.select_action(
-            Side.US, f'Blank_1_Op_Card', is_event_resolved=True)
+            Side.US, f'Blank_1_Op_Card', is_event_resolved=True,
+            defcon_loser=side)
 
 
 class US_Japan_Mutual_Defense_Pact(Card):
@@ -1261,6 +1262,11 @@ class Cuban_Missile_Crisis(Card):
     event_text = 'Set DEFCON to Level 2. Any further Coup attempt by your opponent this turn, anywhere on the board, will result in Global Thermonuclear War. Your opponent will lose the game. This event may be cancelled at any time if the USSR player removes two Influence from Cuba or the US player removes 2 Influence from either West Germany or Turkey.'
     event_unique = True
 
+    @staticmethod
+    def remove_from_basket(game_instance, side: Side):
+        if 'Cuban_Missile_Crisis' in game_instance.basket[side]:
+            game_instance.basket[side].remove('Cuban_Missile_Crisis')
+
     def cuban_missile_remove(self, game_instance, side: Side):
         '''
         Gives an opportunity to the couping player to remove 2 influence from
@@ -1293,7 +1299,7 @@ class Cuban_Missile_Crisis(Card):
             return True
 
         game_instance.input_state = Input(
-            Side.US, InputType.SELECT_COUNTRY,
+            side, InputType.SELECT_COUNTRY,
             partial(cuban_callback, game_instance),
             options,
             prompt='Cuban Missile Crisis: Remove 2 influence to de-escalate.',
@@ -1306,7 +1312,7 @@ class Cuban_Missile_Crisis(Card):
         game_instance.change_defcon(2 - game_instance.defcon_track)
         game_instance.basket[side].append('Cuban_Missile_Crisis')
         game_instance.end_turn_stage_list.append(
-            partial(game_instance.basket[side].remove, 'Cuban_Missile_Crisis'))
+            partial(self.remove_from_basket, game_instance, side))
 
 
 class Nuclear_Subs(Card):
@@ -1915,7 +1921,8 @@ class Lone_Gunman(Card):
             game_instance.hand[Side.US])
         self.event_occurred = True
         game_instance.select_action(
-            Side.USSR, f'Blank_1_Op_Card', is_event_resolved=True)
+            Side.USSR, f'Blank_1_Op_Card', is_event_resolved=True,
+            defcon_loser=side)
 
 
 class Colonial_Rear_Guards(Card):
