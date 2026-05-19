@@ -1277,13 +1277,20 @@ class Game:
         self.stage_list.append(self.deal)
         self.expand_deck()
 
+    def _is_battleground_for_scoring(self, region: MapRegion, name: str):
+        if self.map[name].info.battleground:
+            return True
+        return (
+            region == MapRegion.ASIA
+            and name == 'Taiwan'
+            and 'Formosan_Resolution' in self.basket[Side.US]
+            and self.map[name].control == Side.US
+        )
+
     def score(self, region: MapRegion, check_only=False):
 
         (presence_vps, domination_vps,
          control_vps) = Game.Default.SCORING[region]
-
-        if 'Formosan_Resolution' in self.basket[Side.US]:
-            self.map['Taiwan'].info.battleground = True
 
         shuttle_modifier = 1 if 'Shuttle_Diplomacy' in self.basket[Side.US] else 0
 
@@ -1293,7 +1300,7 @@ class Game:
 
         for n in CountryInfo.REGION_ALL[region]:
             x = self.map[n]
-            if x.info.battleground:
+            if self._is_battleground_for_scoring(region, n):
                 bg_count[x.control] += 1
             country_count[x.control] += 1
             if x.control.opp.name in x.info.adjacent_countries:
@@ -1323,6 +1330,3 @@ class Game:
         else:
             print(
                 f'US:USSR = {vps[Side.US]}:{vps[Side.USSR]}')
-
-        if self.map['Taiwan'].info.battleground:
-            self.map['Taiwan'].info.battleground = False

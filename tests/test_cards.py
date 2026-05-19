@@ -287,6 +287,32 @@ class TestScoringCards:
         # After scoring, Taiwan battleground should be reset
         assert game.map['Taiwan'].info.battleground is False
 
+    def test_formosan_resolution_affects_asia_scoring_when_us_controls_taiwan(self):
+        base = make_game()
+        base.map['Taiwan'].set_influence(0, 5)
+        base.score(MapRegion.ASIA)
+
+        with_formosan = make_game()
+        with_formosan.basket[Side.US].append('Formosan_Resolution')
+        with_formosan.map['Taiwan'].set_influence(0, 5)
+        with_formosan.score(MapRegion.ASIA)
+
+        assert with_formosan.vp_track < base.vp_track
+        assert with_formosan.map['Taiwan'].info.battleground is False
+
+    def test_formosan_resolution_does_not_affect_asia_scoring_if_ussr_controls_taiwan(self):
+        base = make_game()
+        base.map['Taiwan'].set_influence(5, 0)
+        base.score(MapRegion.ASIA)
+
+        with_formosan = make_game()
+        with_formosan.basket[Side.US].append('Formosan_Resolution')
+        with_formosan.map['Taiwan'].set_influence(5, 0)
+        with_formosan.score(MapRegion.ASIA)
+
+        assert with_formosan.vp_track == base.vp_track
+        assert with_formosan.map['Taiwan'].info.battleground is False
+
 
 # ===========================================================================
 # EARLY WAR CARD EVENT TESTS
@@ -1007,6 +1033,29 @@ class TestMidWarCards:
         game.cards['Kitchen_Debates'].use_event(game, Side.US)
         # VP shouldn't change since US doesn't control more BG
         assert game.vp_track == 0
+
+    def test_formosan_resolution_does_not_count_for_kitchen_debates(self):
+        game = make_game()
+        for name in CountryInfo.ALL:
+            game.map[name].reset_influence()
+        game.basket[Side.US].append('Formosan_Resolution')
+        game.map['Taiwan'].set_influence(0, 5)
+        game.map['France'].set_influence(0, 5)
+        game.map['Poland'].set_influence(5, 0)
+        game.cards['Kitchen_Debates'].use_event(game, Side.US)
+        assert game.vp_track == 0
+
+    def test_formosan_resolution_does_not_count_for_summit(self):
+        game = make_game()
+        for name in CountryInfo.ALL:
+            game.map[name].reset_influence()
+        game.basket[Side.US].append('Formosan_Resolution')
+        game.map['Taiwan'].set_influence(0, 5)
+        game.map['Afghanistan'].set_influence(0, 5)
+        game.cards['Summit'].use_event(game, Side.US)
+        game.stage_complete()
+        assert game.input_state.recv((4, 3)) is True
+        assert game.vp_track == 2
 
     def test_missile_envy_creates_exchange(self):
         game = make_game()
