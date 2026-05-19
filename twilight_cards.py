@@ -2504,6 +2504,13 @@ class Star_Wars(Card):
     def can_event(self, game_instance, side):
         return game_instance.space_track[Side.US] > game_instance.space_track[Side.USSR]
 
+    def can_retrieve(self, game_instance, card_name: str):
+        card = game_instance.cards[card_name].info
+        if card.card_type == 'Scoring':
+            return False
+        event_side = card.owner if card.owner in [Side.USSR, Side.US] else Side.US
+        return game_instance.cards[card_name].can_event(game_instance, event_side)
+
     def callback(self, game_instance, card_name: str):
         game_instance.input_state.reps -= 1
         game_instance.trigger_event(Side.US, card_name)
@@ -2515,7 +2522,7 @@ class Star_Wars(Card):
             game_instance.input_state = Input(
                 side, InputType.SELECT_CARD,
                 partial(self.callback, game_instance),
-                (n for n in game_instance.discard_pile if game_instance.cards[n].info.card_type != 'Scoring'),
+                (n for n in game_instance.discard_pile if self.can_retrieve(game_instance, n)),
                 prompt=f'Pick a non-scoring card from the discard pile for Event use immediately.'
             )
 

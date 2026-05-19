@@ -1539,6 +1539,29 @@ class TestLateWarCards:
         game.space_track = [0, 1]
         assert game.cards['Star_Wars'].can_event(game, Side.US) is True
 
+    def test_star_wars_excludes_events_that_cannot_be_played_now(self):
+        game = make_game()
+        game.space_track = [0, 1]
+        game.defcon_track = 3
+        game.discard_pile = ['Wargames', 'Duck_and_Cover']
+        game.cards['Star_Wars'].use_event(game, Side.US)
+        assert list(game.input_state.available_options) == ['Duck_and_Cover']
+
+    def test_star_wars_can_select_wargames_at_defcon_2(self):
+        game = make_game()
+        game.space_track = [0, 1]
+        game.defcon_track = 2
+        game.discard_pile = ['Wargames']
+        game.cards['Star_Wars'].use_event(game, Side.US)
+        assert list(game.input_state.available_options) == ['Wargames']
+
+    def test_star_wars_can_select_ussr_owned_event(self):
+        game = make_game()
+        game.space_track = [0, 1]
+        game.discard_pile = ['Korean_War']
+        game.cards['Star_Wars'].use_event(game, Side.US)
+        assert list(game.input_state.available_options) == ['Korean_War']
+
     def test_north_sea_oil(self):
         """OPEC unplayable, US may play 8 cards this turn."""
         game = make_game()
