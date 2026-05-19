@@ -51,6 +51,14 @@ def make_game() -> Game:
     return game
 
 
+def resolve_pending_stages(game: Game):
+    """Resolve queued stages until another player/random input is required."""
+    while game.stage_list:
+        if game.input_state is not None and not game.input_state.complete:
+            break
+        game.stage_complete()
+
+
 # ===========================================================================
 # CARD METADATA TESTS
 # ===========================================================================
@@ -311,6 +319,62 @@ class TestEarlyWarCards:
         assert game.input_state is not None
         assert game.input_state.side == Side.NEUTRAL
 
+    def test_five_year_plan_triggers_us_event_then_discards(self):
+        game = make_game()
+        game.defcon_track = 5
+        game.hand[Side.USSR] = ['Duck_and_Cover']
+        game.cards['Five_Year_Plan'].use_event(game, Side.US)
+        assert game.input_state.recv('Duck_and_Cover') is True
+        assert 'Duck_and_Cover' not in game.hand[Side.USSR]
+        resolve_pending_stages(game)
+        assert game.defcon_track == 4
+        assert game.vp_track == -1
+        assert 'Duck_and_Cover' in game.discard_pile
+
+    def test_five_year_plan_discards_ussr_event_without_triggering(self):
+        game = make_game()
+        game.map['Cuba'].set_influence(0, 3)
+        game.hand[Side.USSR] = ['Fidel']
+        game.cards['Five_Year_Plan'].use_event(game, Side.US)
+        assert game.input_state.recv('Fidel') is True
+        resolve_pending_stages(game)
+        assert game.map['Cuba'].influence[Side.US] == 3
+        assert game.map['Cuba'].influence[Side.USSR] == 0
+        assert 'Fidel' in game.discard_pile
+        assert 'Fidel' not in game.removed_pile
+
+    def test_five_year_plan_defectors_awards_us_vp(self):
+        game = make_game()
+        game.ar_side = Side.USSR
+        game.hand[Side.USSR] = ['Defectors']
+        game.cards['Five_Year_Plan'].use_event(game, Side.US)
+        assert game.input_state.recv('Defectors') is True
+        resolve_pending_stages(game)
+        assert game.vp_track == -1
+        assert 'Defectors' in game.discard_pile
+
+    def test_five_year_plan_removes_unique_us_event_after_triggering(self):
+        game = make_game()
+        game.hand[Side.USSR] = ['US_Japan_Mutual_Defense_Pact']
+        game.cards['Five_Year_Plan'].use_event(game, Side.US)
+        assert game.input_state.recv('US_Japan_Mutual_Defense_Pact') is True
+        resolve_pending_stages(game)
+        assert game.map['Japan'].control == Side.US
+        assert 'US_Japan_Mutual_Defense_Pact' in game.removed_pile
+        assert 'US_Japan_Mutual_Defense_Pact' not in game.discard_pile
+
+    def test_five_year_plan_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.USSR] = ['The_China_Card', 'Fidel']
+        game.cards['Five_Year_Plan'].use_event(game, Side.US)
+        assert list(game.input_state.available_options) == ['Fidel']
+
+    def test_five_year_plan_with_only_china_card_has_no_discard(self):
+        game = make_game()
+        game.hand[Side.USSR] = ['The_China_Card']
+        game.cards['Five_Year_Plan'].use_event(game, Side.US)
+        assert game.input_state.complete is True
+
     def test_the_china_card_cannot_event(self):
         game = make_game()
         assert game.cards['The_China_Card'].can_event(game, Side.USSR) is False
@@ -371,6 +435,12 @@ class TestEarlyWarCards:
         game.cards['Blockade'].use_event(game, Side.USSR)
         assert game.input_state is not None
         assert game.input_state.side == Side.US
+
+    def test_blockade_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card', 'NATO']
+        game.cards['Blockade'].use_event(game, Side.USSR)
+        assert list(game.input_state.available_options) == ['NATO']
 
     def test_korean_war(self):
         """Korean War triggers war on South Korea for USSR."""
@@ -574,6 +644,12 @@ class TestEarlyWarCards:
         game.cards['Red_Scare_Purge'].use_event(game, Side.USSR)
         assert game.get_global_effective_ops(Side.US, 1) == 1
 
+    def test_un_intervention_cannot_select_china_card(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card', 'Fidel']
+        game.cards['UN_Intervention'].use_event(game, Side.US)
+        assert list(game.input_state.available_options) == ['Fidel']
+
     def test_nuclear_test_ban(self):
         """VP = DEFCON - 2, then improve DEFCON by 2."""
         game = make_game()
@@ -671,6 +747,20 @@ class TestMidWarCards:
         game.cards['Quagmire'].use_event(game, Side.US)
         assert 'NORAD' not in game.basket[Side.US]
         assert 'Quagmire' in game.basket[Side.US]
+
+    def test_quagmire_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card', 'Red_Scare_Purge']
+        game.basket[Side.US].append('Quagmire')
+        game.qbt_discard(Side.US, 'Quagmire')
+        assert list(game.input_state.available_options) == ['Red_Scare_Purge']
+
+    def test_bear_trap_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.USSR] = ['The_China_Card', 'Red_Scare_Purge']
+        game.basket[Side.USSR].append('Bear_Trap')
+        game.qbt_discard(Side.USSR, 'Bear_Trap')
+        assert list(game.input_state.available_options) == ['Red_Scare_Purge']
 
     def test_salt_negotiations(self):
         """Improve DEFCON by 2, add SALT to basket."""
@@ -928,6 +1018,14 @@ class TestMidWarCards:
         game.cards['Alliance_for_Progress'].use_event(game, Side.US)
         assert game.vp_track == -2
 
+    def test_ask_not_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card', 'Duck_and_Cover']
+        game.cards['Ask_Not_What_Your_Country_Can_Do_For_You'].use_event(
+            game, Side.US)
+        assert list(game.input_state.available_options) == ['Duck_and_Cover']
+        assert game.input_state.reps == 1
+
     def test_one_small_step_requires_behind(self):
         game = make_game()
         game.space_track = [0, 0]
@@ -1150,6 +1248,21 @@ class TestLateWarCards:
         game.cards['Terrorism'].use_event(game, Side.USSR)
         assert game.input_state.reps == 1
 
+    def test_terrorism_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card', 'NATO']
+        game.cards['Terrorism'].use_event(game, Side.USSR)
+        assert list(game.input_state.available_options) == ['NATO']
+        assert game.input_state.recv('NATO') is True
+        assert 'The_China_Card' in game.hand[Side.US]
+        assert 'NATO' in game.discard_pile
+
+    def test_terrorism_with_only_china_card_has_no_discard(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card']
+        game.cards['Terrorism'].use_event(game, Side.USSR)
+        assert game.input_state.complete is True
+
     def test_iran_contra_scandal(self):
         game = make_game()
         game.cards['Iran_Contra_Scandal'].use_event(game, Side.USSR)
@@ -1168,6 +1281,12 @@ class TestLateWarCards:
         # The basket should contain the dynamic effect name, not 'effect_name'
         assert 'effect_name' not in game.basket[Side.US]
         assert any(item.startswith('Chernobyl_') for item in game.basket[Side.US])
+
+    def test_latin_american_debt_crisis_cannot_discard_china_card(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card', 'NATO']
+        game.cards['Latin_American_Debt_Crisis'].use_event(game, Side.USSR)
+        assert list(game.input_state.available_options) == ['NATO']
 
     def test_tear_down_this_wall(self):
         """Cancel Willy Brandt, add 3 US in East Germany, free coup/realignment."""

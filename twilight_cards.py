@@ -182,31 +182,41 @@ class Five_Year_Plan(Card):
     owner = Side.US
     event_text = 'USSR player must randomly discard one card. If the card is a US associated Event, the Event occurs immediately. If the card is a USSR associated Event or and Event applicable to both players, then the card must be discarded without triggering the Event.'
 
+    def discard_selected_card(self, game_instance, card_name: str):
+        card = game_instance.cards[card_name]
+        if card.event_occurred and card.event_unique:
+            game_instance.removed_pile.append(card_name)
+        else:
+            game_instance.discard_pile.append(card_name)
+            card.event_occurred = False
+
     def callback(self, game_instance, card_name: str):
         game_instance.input_state.reps -= 1
         print(f'{card_name} was selected by Five_Year_Plan.')
+
+        game_instance.hand[Side.USSR].remove(card_name)
         if game_instance.cards[card_name].info.owner == Side.US:
             # must append backwards!
             game_instance.stage_list.append(
-                partial(game_instance.cards[card_name].dispose, game_instance, Side.USSR))
+                partial(self.discard_selected_card, game_instance, card_name))
             game_instance.stage_list.append(
                 partial(game_instance.trigger_event, Side.USSR, card_name))
         else:
-            game_instance.stage_list.append(
-                partial(game_instance.cards[card_name].dispose, game_instance, Side.USSR))
+            self.discard_selected_card(game_instance, card_name)
         return True
 
     def use_event(self, game_instance, side: Side):
         self.event_occurred = True
-        # check that USSR player has enough cards
-        reps = len(game_instance.hand[Side.USSR]) if len(
-            game_instance.hand[Side.USSR]) <= 1 else 1
+        discardable_cards = [
+            n for n in game_instance.hand[Side.USSR]
+            if n not in ['Five_Year_Plan', 'The_China_Card']
+        ]
+        reps = min(len(discardable_cards), 1)
 
         game_instance.input_state = Input(
             Side.NEUTRAL, InputType.SELECT_CARD,
             partial(self.callback, game_instance),
-            (n for n in game_instance.hand[Side.USSR]
-             if n != 'Five_Year_Plan'),
+            discardable_cards,
             prompt='Five Year Plan: USSR randomly discards a card.',
             reps=reps
         )
@@ -847,6 +857,11 @@ class Suez_Crisis(Card):
     def use_event(self, game_instance, side: Side):
         self.event_occurred = True
         suez = ['France', 'UK', 'Israel']
+        reps = min(
+            4,
+            sum(min(game_instance.map[n].influence[Side.US], 2)
+                for n in suez)
+        )
 
         game_instance.input_state = Input(
             Side.USSR, InputType.SELECT_COUNTRY,
@@ -854,7 +869,7 @@ class Suez_Crisis(Card):
                     Country.decrement_influence, Side.US),
             (n for n in suez if game_instance.map[n].has_us_influence),
             prompt='Remove US influence using Suez Crisis.',
-            reps=4,
+            reps=reps,
             reps_unit='influence',
             max_per_option=2
         )
@@ -1568,7 +1583,8 @@ class Missile_Envy(Card):
             game.hand[side.opp].append(self.name)
             self.exchange = False
         else:
-            game.basket[side].remove(self.name)
+            if self.name in game.basket[side]:
+                game.basket[side].remove(self.name)
             super().dispose(game, side)
 
     def can_event(self, game, side):
@@ -1586,7 +1602,7 @@ class Missile_Envy(Card):
             options = [CardAction.INFLUENCE, CardAction.COUP,
                        CardAction.REALIGNMENT, CardAction.SPACE]
 
-            self.input_state = Input(
+            game.input_state = Input(
                 side, InputType.SELECT_CARD_ACTION,
                 partial(game.action_callback, side, card,
                         no_event=True),
@@ -1599,6 +1615,7 @@ class Missile_Envy(Card):
             game.stage_list.append(
                 partial(game.cards[card].dispose, game, side))
             game.stage_list.append(partial(game.trigger_event, side, card))
+        return True
 
     def use_event(self, game, side: Side):
         self.event_occurred = True
@@ -2031,6 +2048,7 @@ class Grain_Sales_to_Soviets(Card):
         game_instance.hand[Side.US].append(card_name)
         game_instance.stage_list.append(
             partial(self.action_stage, game_instance, card_name))
+        return True
 
     def use_event(self, game_instance, side: Side):
         self.event_occurred = True
@@ -2620,13 +2638,16 @@ class Terrorism(Card):
         self.event_occurred = True
         reps = 2 if 'Iranian_Hostage_Crisis' in game_instance.basket[
             Side.USSR] and side == Side.USSR else 1
-        reps = len(game_instance.hand[side.opp]) if len(
-            game_instance.hand[side.opp]) <= reps else reps
+        discardable_cards = [
+            n for n in game_instance.hand[side.opp]
+            if n != 'The_China_Card'
+        ]
+        reps = min(len(discardable_cards), reps)
 
         game_instance.input_state = Input(
             Side.NEUTRAL, InputType.SELECT_CARD,
-            self.callback,
-            game_instance.hand[side.opp],
+            partial(self.callback, game_instance, side),
+            discardable_cards,
             prompt='Randomly discard a card.',
             reps=reps,
             reps_unit='cards to discard',

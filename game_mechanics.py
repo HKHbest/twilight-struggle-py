@@ -30,6 +30,7 @@ class Game:
 
     def __init__(self):
 
+        self.terminated = False
         self.vp_track = 0
         self.turn_track = 0
         self.ar_track = 0
@@ -64,6 +65,7 @@ class Game:
     def start(self, handicap=-2):
 
         self.started = True
+        self.terminated = False
         self.vp_track = 0  # positive for ussr
         self.turn_track = 1
         self.ar_track = 0
@@ -107,6 +109,7 @@ class Game:
             If side is Side.NEUTRAL, determine winner as the player with more VPs.
         '''
         self.stage_list.clear()
+        self.terminated = True
         if side != Side.NEUTRAL:
             winner = side.toStr()
         else:
@@ -458,7 +461,7 @@ class Game:
                 return False
             if self.space_track[side] == 7 and self.get_global_effective_ops(side, card_name.info.ops) == 4:
                 return True
-            elif self.space_track[side] >= 5 and self.get_global_effective_ops(side, card_name.info.ops) >= 3:
+            elif self.space_track[side] >= 5 and self.get_global_effective_ops(side, self.cards[card_name].info.ops) >= 3:
                 return True
             elif self.get_global_effective_ops(side, self.cards[card_name].info.ops) >= 2:
                 return True
@@ -901,7 +904,7 @@ class Game:
 
         # Cuban Missile Crisis
         if 'Cuban_Missile_Crisis' in self.basket[side.opp]:
-            self.cards['Cuban_Missile_Crisis'].cuban_missile_remove(side)
+            self.cards['Cuban_Missile_Crisis'].cuban_missile_remove(self, side)
 
         def choose_coup_country():
             self.input_state = Input(
@@ -1076,9 +1079,15 @@ class Game:
         # If we have as many scoring cards as action rounds, then we must play
         # a scoring card. Q/BT stays in basket.
         if len(scoring_cards) == self.ars_remaining(side):
+            def play_scoring_callback(card_name):
+                self.input_state.reps -= 1
+                self.trigger_event(side, card_name)
+                self.cards[card_name].dispose(self, side)
+                return True
+
             self.input_state = Input(
                 side, InputType.SELECT_CARD,
-                partial(self.trigger_event, side),
+                play_scoring_callback,
                 scoring_cards,
                 prompt='You must play a scoring card.'
             )
@@ -1265,9 +1274,9 @@ class Game:
             return
         advance_turn_marker(self)  # turn marker advanced before final scoring
         self.change_defcon(1)
+        self.stage_list.append(self.process_headline)
+        self.stage_list.append(self.deal)
         self.expand_deck()
-        self.deal()  # turn marker advanced before dealing
-        self.process_headline()
 
     def score(self, region: MapRegion, check_only=False):
 
