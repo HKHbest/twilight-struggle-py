@@ -610,6 +610,36 @@ class TestEarlyWarCards:
         game.cards['Warsaw_Pact_Formed'].use_event(game, Side.USSR)
         assert 'Warsaw_Pact_Formed' in game.basket[Side.US]
 
+    def test_warsaw_pact_remove_requires_four_targets_when_available(self):
+        game = make_game()
+        eastern_europe = sorted(CountryInfo.REGION_ALL[MapRegion.EASTERN_EUROPE])
+        for name in eastern_europe:
+            game.map[name].set_influence(game.map[name].influence[Side.USSR], 1)
+        game.cards['Warsaw_Pact_Formed'].use_event(game, Side.USSR)
+        assert game.input_state.recv(
+            'Remove all US influence from 4 countries in Eastern Europe') is True
+        for name in eastern_europe[:3]:
+            assert game.input_state.recv(name) is True
+        assert game.input_state.reps == 1
+        assert game.input_state.complete is False
+        assert set(eastern_europe[3:]).issubset(set(game.input_state.available_options))
+
+    def test_warsaw_pact_remove_completes_when_fewer_than_four_targets_exist(self):
+        game = make_game()
+        eastern_europe = sorted(CountryInfo.REGION_ALL[MapRegion.EASTERN_EUROPE])
+        targets = eastern_europe[:3]
+        for name in eastern_europe:
+            game.map[name].set_influence(game.map[name].influence[Side.USSR], 0)
+        for name in targets:
+            game.map[name].set_influence(game.map[name].influence[Side.USSR], 1)
+        game.cards['Warsaw_Pact_Formed'].use_event(game, Side.USSR)
+        assert game.input_state.recv(
+            'Remove all US influence from 4 countries in Eastern Europe') is True
+        for name in targets:
+            assert game.input_state.recv(name) is True
+        assert game.input_state.complete is True
+        assert all(game.map[name].influence[Side.US] == 0 for name in targets)
+
     def test_de_gaulle_leads_france(self):
         """Remove 2 US influence from France, add 1 USSR. Cancel NATO for France."""
         game = make_game()
