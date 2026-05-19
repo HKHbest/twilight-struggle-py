@@ -387,6 +387,35 @@ class TestEarlyWarCards:
         assert 'The_China_Card' in game.hand[Side.US]
         assert game.cards['The_China_Card'].is_playable is False
 
+    def test_china_card_reset_clears_extra_point_state(self):
+        game = make_game()
+        card = game.cards['The_China_Card']
+        card.all_points_in_region = False
+        card.extra_point_given = True
+        card.extra_point_taken = True
+        card.reset()
+        assert card.all_points_in_region is True
+        assert card.extra_point_given is False
+        assert card.extra_point_taken is False
+
+    def test_china_card_all_asia_influence_gets_bonus_after_red_scare(self):
+        game = make_game()
+        game.basket[Side.US].append('Red_Scare_Purge')
+        game.card_operation_influence(Side.USSR, 'The_China_Card')
+        before = game.map['North_Korea'].influence[Side.USSR]
+        for _ in range(4):
+            assert game.input_state.recv('North_Korea') is True
+        assert game.input_state.complete is True
+        assert game.map['North_Korea'].influence[Side.USSR] == before + 4
+
+    def test_china_card_us_play_removes_formosan_resolution(self):
+        game = make_game()
+        game.hand[Side.US] = ['The_China_Card']
+        game.basket[Side.US].append('Formosan_Resolution')
+        game.select_card(Side.US)
+        assert game.input_state.recv('The_China_Card') is True
+        assert 'Formosan_Resolution' not in game.basket[Side.US]
+
     def test_socialist_governments(self):
         """Remove 3 US influence from Western Europe, max 2 per country."""
         game = make_game()
@@ -1437,6 +1466,24 @@ class TestGameMechanics:
         game = make_game()
         game.basket[Side.US].append('Red_Scare_Purge')
         assert game.get_global_effective_ops(Side.USSR, 1) == 1
+
+    def test_final_scoring_china_card_vp_for_ussr_holder(self):
+        game = make_game()
+        game.turn_track = 10
+        game.hand[Side.USSR] = ['The_China_Card']
+        game.score = lambda region: None
+        game.end_of_turn()
+        assert game.vp_track == 1
+        assert game.terminated is True
+
+    def test_final_scoring_china_card_vp_for_us_holder(self):
+        game = make_game()
+        game.turn_track = 10
+        game.hand[Side.US] = ['The_China_Card']
+        game.score = lambda region: None
+        game.end_of_turn()
+        assert game.vp_track == -1
+        assert game.terminated is True
 
     def test_calculate_nato_countries(self):
         game = make_game()

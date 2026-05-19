@@ -259,6 +259,7 @@ class The_China_Card(Card):
     def reset(self):
         self.all_points_in_region = True
         self.extra_point_given = False
+        self.extra_point_taken = False
 
     def give_rep(self, game_instance, name, repetitions):
         '''
