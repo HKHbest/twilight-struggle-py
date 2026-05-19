@@ -2407,32 +2407,58 @@ class Our_Man_In_Tehran(Card):
     def can_event(self, game_instance, side):
         return any(game_instance.map[n].control == Side.US for n in CountryInfo.REGION_ALL[MapRegion.MIDDLE_EAST])
 
-    def stage_2(self, game_instance):
-        game_instance.draw_pile.extend(game_instance.hand[Side.NEUTRAL])
-        game_instance.players[Side.US].update_draw_pile(
-            game_instance.hand[Side.NEUTRAL])
+    def return_remaining_cards(self, game_instance):
+        returned_cards = list(game_instance.hand[Side.NEUTRAL])
+        game_instance.draw_pile.extend(returned_cards)
+        if game_instance.players[Side.US] is not None:
+            game_instance.players[Side.US].update_draw_pile(returned_cards)
         game_instance.hand[Side.NEUTRAL] = []
+        if returned_cards:
+            game_instance.shuffle_draw_pile_stage()
         return True
 
     def callback(self, game_instance, opt: str):
+        if opt == game_instance.input_state.option_stop_early:
+            game_instance.input_state.reps = 0
+            return self.return_remaining_cards(game_instance)
+
         game_instance.input_state.reps -= 1
         game_instance.discard_pile.append(opt)
         game_instance.hand[Side.NEUTRAL].remove(opt)
-        game_instance.stage_list.append(partial(self.stage_2, game_instance))
+        game_instance.input_state.remove_option(opt)
+        if not game_instance.hand[Side.NEUTRAL]:
+            return self.return_remaining_cards(game_instance)
         return True
+
+    def prompt_discards(self, game_instance):
+        game_instance.input_state = Input(
+            Side.US, InputType.SELECT_CARD,
+            partial(self.callback, game_instance),
+            list(game_instance.hand[Side.NEUTRAL]),
+            prompt=f'Our Man In Tehran: Discard any of these cards.',
+            reps=len(game_instance.hand[Side.NEUTRAL]),
+            max_per_option=1,
+            option_stop_early='Return remaining cards to draw deck.'
+        )
+
+    def draw_and_prompt(self, game_instance, target_neutral_hand_size: int):
+        while game_instance.draw_pile and len(game_instance.hand[Side.NEUTRAL]) < target_neutral_hand_size:
+            game_instance.hand[Side.NEUTRAL].append(game_instance.draw_pile.pop())
+        self.prompt_discards(game_instance)
 
     def use_event(self, game_instance, side: Side):
         if self.can_event(game_instance, Side.US):
             self.event_occurred = True
-            game_instance.deal(first_side=Side.NEUTRAL)
+            target_neutral_hand_size = len(game_instance.hand[Side.NEUTRAL]) + 5
 
-            game_instance.input_state = Input(
-                Side.US, InputType.SELECT_CARD,
-                partial(self.callback, game_instance),
-                (n for n in game_instance.hand[Side.NEUTRAL]),
-                prompt=f'Our Man In Tehran: Discard any of these cards.',
-                reps=5
-            )
+            if len(game_instance.draw_pile) < 5 and game_instance.discard_pile:
+                game_instance.draw_pile.extend(game_instance.discard_pile)
+                game_instance.discard_pile = []
+                game_instance.stage_list.append(
+                    partial(self.draw_and_prompt, game_instance, target_neutral_hand_size))
+                game_instance.shuffle_draw_pile_stage()
+            else:
+                self.draw_and_prompt(game_instance, target_neutral_hand_size)
 
 
 # --

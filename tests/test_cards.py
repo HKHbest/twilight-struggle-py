@@ -1467,6 +1467,79 @@ class TestMidWarCards:
         # Should push coup stages
         assert len(game.stage_list) > 0
 
+    def test_our_man_in_tehran_can_return_all_drawn_cards(self):
+        game = make_game()
+        game.map['Israel'].set_influence(0, 4)
+        game.draw_pile = [
+            'Duck_and_Cover', 'Fidel', 'NATO',
+            'Korean_War', 'Warsaw_Pact_Formed', 'Truman_Doctrine'
+        ]
+        game.cards['Our_Man_In_Tehran'].use_event(game, Side.US)
+        drawn = set(game.hand[Side.NEUTRAL])
+        assert len(drawn) == 5
+        assert game.input_state.recv('Return remaining cards to draw deck.') is True
+        assert game.hand[Side.NEUTRAL] == []
+        assert game.discard_pile == []
+        assert game.input_state.side == Side.NEUTRAL
+        assert set(game.input_state.available_options) == drawn | {'Duck_and_Cover'}
+
+    def test_our_man_in_tehran_discards_some_and_returns_rest(self):
+        game = make_game()
+        game.map['Israel'].set_influence(0, 4)
+        game.draw_pile = [
+            'Duck_and_Cover', 'Fidel', 'NATO',
+            'Korean_War', 'Warsaw_Pact_Formed', 'Truman_Doctrine'
+        ]
+        game.cards['Our_Man_In_Tehran'].use_event(game, Side.US)
+        first, second = list(game.hand[Side.NEUTRAL])[:2]
+        assert game.input_state.recv(first) is True
+        assert game.input_state.recv(second) is True
+        assert game.input_state.recv('Return remaining cards to draw deck.') is True
+        assert first in game.discard_pile
+        assert second in game.discard_pile
+        assert game.hand[Side.NEUTRAL] == []
+        assert first not in set(game.input_state.available_options)
+        assert second not in set(game.input_state.available_options)
+
+    def test_our_man_in_tehran_discards_all_without_return_shuffle(self):
+        game = make_game()
+        game.map['Israel'].set_influence(0, 4)
+        game.draw_pile = [
+            'Duck_and_Cover', 'Fidel', 'NATO',
+            'Korean_War', 'Warsaw_Pact_Formed', 'Truman_Doctrine'
+        ]
+        game.cards['Our_Man_In_Tehran'].use_event(game, Side.US)
+        drawn = list(game.hand[Side.NEUTRAL])
+        for card_name in drawn:
+            assert game.input_state.recv(card_name) is True
+        assert game.input_state.complete is True
+        assert game.hand[Side.NEUTRAL] == []
+        assert set(drawn).issubset(set(game.discard_pile))
+        assert game.draw_pile == ['Duck_and_Cover']
+
+    def test_our_man_in_tehran_reshuffles_before_drawing_if_deck_is_short(self):
+        game = make_game()
+        game.map['Israel'].set_influence(0, 4)
+        game.draw_pile = ['Duck_and_Cover', 'Fidel']
+        game.discard_pile = [
+            'NATO', 'Korean_War', 'Warsaw_Pact_Formed', 'Truman_Doctrine'
+        ]
+        game.cards['Our_Man_In_Tehran'].use_event(game, Side.US)
+        assert game.hand[Side.NEUTRAL] == []
+        assert game.discard_pile == []
+        assert game.input_state.side == Side.NEUTRAL
+        shuffle_options = list(game.input_state.available_options)
+        assert set(shuffle_options) == {
+            'Duck_and_Cover', 'Fidel', 'NATO',
+            'Korean_War', 'Warsaw_Pact_Formed', 'Truman_Doctrine'
+        }
+        for card_name in shuffle_options:
+            assert game.input_state.recv(card_name) is True
+        resolve_pending_stages(game)
+        assert game.input_state.side == Side.US
+        assert len(game.hand[Side.NEUTRAL]) == 5
+        assert len(game.draw_pile) == 1
+
     def test_liberation_theology(self):
         """Add 3 USSR influence in Central America, max 2 per country."""
         game = make_game()
