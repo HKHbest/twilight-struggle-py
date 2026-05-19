@@ -663,6 +663,25 @@ class TestEarlyWarCards:
         assert game.input_state is not None
         assert game.input_state.side == Side.US
 
+    def test_truman_doctrine_removes_all_ussr_influence(self):
+        game = make_game()
+        game.map['Finland'].set_influence(2, 0)
+        game.cards['Truman_Doctrine'].use_event(game, Side.US)
+        assert game.input_state.recv('Finland') is True
+        assert game.map['Finland'].influence[Side.USSR] == 0
+        assert game.input_state.complete is True
+
+    def test_truman_doctrine_only_targets_uncontrolled_european_countries(self):
+        game = make_game()
+        game.map['Finland'].set_influence(2, 0)
+        game.map['Poland'].set_influence(3, 0)
+        game.map['Iran'].set_influence(1, 0)
+        game.cards['Truman_Doctrine'].use_event(game, Side.US)
+        available = set(game.input_state.available_options)
+        assert 'Finland' in available
+        assert 'Poland' not in available
+        assert 'Iran' not in available
+
     def test_olympic_games_creates_choice(self):
         """Opponent chooses to participate or boycott."""
         game = make_game()
