@@ -1625,8 +1625,11 @@ class Missile_Envy(Card):
 
         best_ops = 0
         best_cards = []
+        headline_phase = game.ar_track == 0
         for card_name in game.hand[side.opp]:
             if card_name == 'The_China_Card':
+                continue
+            if headline_phase and card_name == 'UN_Intervention':
                 continue
             curr_ops = game.get_global_effective_ops(
                 side.opp, game.cards[card_name].ops)
@@ -2010,6 +2013,14 @@ class Grain_Sales_to_Soviets(Card):
     owner = Side.US
     event_text = 'Randomly choose one card from USSR hand. Play it or return it. If Soviet player has no cards, or returned, use this card to conduct Operations normally.'
 
+    def return_card_to_ussr(self, game_instance, card_name: str):
+        if card_name in game_instance.hand[Side.US]:
+            game_instance.hand[Side.US].remove(card_name)
+        if card_name not in game_instance.hand[Side.USSR]:
+            game_instance.hand[Side.USSR].append(card_name)
+        game_instance.select_action(
+            Side.US, 'Blank_2_Op_Card', is_event_resolved=True)
+
     def use_un_intervention(self, game_instance, card_name: str):
         # the only exception where UN intervention is used out of place without calling card_callback
         game_instance.stage_list.append(
@@ -2021,13 +2032,16 @@ class Grain_Sales_to_Soviets(Card):
             game_instance.basket[Side.USSR].remove('U2_Incident')
 
     def action_stage(self, game_instance, card_name: str):
+        if game_instance.ar_track == 0 and card_name == 'UN_Intervention':
+            self.return_card_to_ussr(game_instance, card_name)
+            return
+
         # if received card is Side.USSR, then offer to use UN intervention if holding
         option_function_mapping = {
             'Use card normally':
                 partial(game_instance.select_action, Side.US, card_name),
             'Return card to USSR':
-                partial(game_instance.select_action, Side.US,
-                        'Blank_2_Op_Card', is_event_resolved=True)
+                partial(self.return_card_to_ussr, game_instance, card_name)
         }
 
         if 'UN_Intervention' in game_instance.hand[Side.US] and \

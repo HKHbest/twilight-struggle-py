@@ -829,6 +829,12 @@ class TestEarlyWarCards:
         game.cards['UN_Intervention'].use_event(game, Side.US)
         assert list(game.input_state.available_options) == ['Fidel']
 
+    def test_un_intervention_not_available_for_headline_selection(self):
+        game = make_game()
+        game.hand[Side.US] = ['UN_Intervention', 'Duck_and_Cover']
+        game.choose_headline(Side.US)
+        assert list(game.input_state.available_options) == ['Duck_and_Cover']
+
     def test_nuclear_test_ban(self):
         """VP = DEFCON - 2, then improve DEFCON by 2."""
         game = make_game()
@@ -1007,6 +1013,36 @@ class TestMidWarCards:
         game.hand[Side.US] = ['NATO', 'Duck_and_Cover', 'Fidel']
         game.cards['Missile_Envy'].use_event(game, Side.USSR)
         assert game.input_state is not None
+
+    def test_missile_envy_headline_cannot_target_un_intervention(self):
+        game = make_game()
+        game.ar_track = 0
+        game.hand[Side.US] = ['UN_Intervention', 'Blockade']
+        game.cards['Missile_Envy'].use_event(game, Side.USSR)
+        assert list(game.input_state.available_options) == ['Blockade']
+
+    def test_grain_sales_headline_forces_return_of_un_intervention(self):
+        game = make_game()
+        game.ar_track = 0
+        game.hand[Side.USSR] = ['UN_Intervention']
+        game.cards['Grain_Sales_to_Soviets'].use_event(game, Side.US)
+        assert game.input_state.recv('UN_Intervention') is True
+        assert 'UN_Intervention' in game.hand[Side.US]
+        game.stage_complete()
+        assert 'UN_Intervention' in game.hand[Side.USSR]
+        assert 'UN_Intervention' not in game.hand[Side.US]
+        assert game.input_state.side == Side.US
+        assert game.input_state.prompt == 'Select an action for Blank_2_Op_Card.'
+
+    def test_grain_sales_return_option_returns_card_to_ussr(self):
+        game = make_game()
+        game.hand[Side.USSR] = ['Fidel']
+        game.cards['Grain_Sales_to_Soviets'].use_event(game, Side.US)
+        assert game.input_state.recv('Fidel') is True
+        game.stage_complete()
+        assert game.input_state.recv('Return card to USSR') is True
+        assert 'Fidel' in game.hand[Side.USSR]
+        assert 'Fidel' not in game.hand[Side.US]
 
     def test_we_will_bury_you(self):
         """Degrade DEFCON by 1, add to basket."""
