@@ -637,12 +637,28 @@ class Game:
                 partial(self.card_operation_coup, side, card_name,
                         defcon_loser=defcon_loser))
 
-        if 'Flower_Power' in self.basket[Side.USSR]:
-            if action in [CardAction.PLAY_EVENT, CardAction.INFLUENCE, CardAction.REALIGNMENT, CardAction.COUP]:
-                if card_name in ['Arab_Israeli_War', 'Indo_Pakistani_War', 'Korean_War', 'Brush_War', 'Iran_Iraq_War']:
-                    self.change_vp(2)
+        if self._triggers_flower_power(side, card_name, action):
+            self.change_vp(2)
 
     # Utility functions used in stages
+
+    def _triggers_flower_power(self, side: Side, card_name: str, action: CardAction):
+        war_cards = {
+            'Arab_Israeli_War', 'Indo_Pakistani_War', 'Korean_War',
+            'Brush_War', 'Iran_Iraq_War'
+        }
+        if 'Flower_Power' not in self.basket[Side.USSR]:
+            return False
+        if side != Side.US:
+            return False
+        if action not in [CardAction.PLAY_EVENT, CardAction.INFLUENCE, CardAction.REALIGNMENT, CardAction.COUP]:
+            return False
+        if card_name not in war_cards:
+            return False
+        return not (
+            card_name == 'Arab_Israeli_War'
+            and 'Camp_David_Accords' in self.basket[Side.US]
+        )
 
     def get_global_effective_ops(self, side: Side, raw_ops: int):
         '''

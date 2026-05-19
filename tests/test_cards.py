@@ -1292,6 +1292,25 @@ class TestMidWarCards:
         game.cards['Flower_Power'].use_event(game, Side.USSR)
         assert 'Flower_Power' in game.basket[Side.USSR]
 
+    def test_flower_power_us_war_card_ops_grants_ussr_vp(self):
+        game = make_game()
+        game.basket[Side.USSR].append('Flower_Power')
+        game.resolve_card_action(Side.US, 'Arab_Israeli_War', CardAction.INFLUENCE.name)
+        assert game.vp_track == 2
+
+    def test_flower_power_camp_david_blocks_arab_israeli_war_vp(self):
+        game = make_game()
+        game.basket[Side.USSR].append('Flower_Power')
+        game.basket[Side.US].append('Camp_David_Accords')
+        game.resolve_card_action(Side.US, 'Arab_Israeli_War', CardAction.INFLUENCE.name)
+        assert game.vp_track == 0
+
+    def test_flower_power_only_triggers_on_us_played_war_cards(self):
+        game = make_game()
+        game.basket[Side.USSR].append('Flower_Power')
+        game.resolve_card_action(Side.USSR, 'Arab_Israeli_War', CardAction.PLAY_EVENT.name)
+        assert game.vp_track == 0
+
     def test_opec(self):
         """USSR gains 1 VP per controlled OPEC country."""
         game = make_game()
