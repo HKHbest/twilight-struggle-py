@@ -1480,8 +1480,12 @@ class TestMidWarCards:
         assert game.input_state.recv('Return remaining cards to draw deck.') is True
         assert game.hand[Side.NEUTRAL] == []
         assert game.discard_pile == []
-        assert game.input_state.side == Side.NEUTRAL
-        assert set(game.input_state.available_options) == drawn | {'Duck_and_Cover'}
+        assert game.input_state.complete is True
+        assert game.draw_pile == [
+            'Duck_and_Cover', 'Fidel', 'NATO',
+            'Korean_War', 'Warsaw_Pact_Formed', 'Truman_Doctrine'
+        ]
+        assert set(drawn).issubset(set(game.draw_pile))
 
     def test_our_man_in_tehran_discards_some_and_returns_rest(self):
         game = make_game()
@@ -1500,6 +1504,10 @@ class TestMidWarCards:
         assert game.hand[Side.NEUTRAL] == []
         assert first not in set(game.input_state.available_options)
         assert second not in set(game.input_state.available_options)
+        assert game.input_state.complete is True
+        assert game.draw_pile == [
+            'Duck_and_Cover', 'Fidel', 'NATO', 'Korean_War'
+        ]
 
     def test_our_man_in_tehran_discards_all_without_return_shuffle(self):
         game = make_game()

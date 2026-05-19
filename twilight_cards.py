@@ -2409,12 +2409,10 @@ class Our_Man_In_Tehran(Card):
 
     def return_remaining_cards(self, game_instance):
         returned_cards = list(game_instance.hand[Side.NEUTRAL])
-        game_instance.draw_pile.extend(returned_cards)
+        game_instance.draw_pile.extend(reversed(returned_cards))
         if game_instance.players[Side.US] is not None:
             game_instance.players[Side.US].update_draw_pile(returned_cards)
         game_instance.hand[Side.NEUTRAL] = []
-        if returned_cards:
-            game_instance.shuffle_draw_pile_stage()
         return True
 
     def callback(self, game_instance, opt: str):
