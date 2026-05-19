@@ -2473,7 +2473,7 @@ class Star_Wars(Card):
             self.event_occurred = True
             game_instance.input_state = Input(
                 side, InputType.SELECT_CARD,
-                partial(self.callback, game_instance, side),
+                partial(self.callback, game_instance),
                 (n for n in game_instance.discard_pile if game_instance.cards[n].info.card_type != 'Scoring'),
                 prompt=f'Pick a non-scoring card from the discard pile for Event use immediately.'
             )
@@ -2506,6 +2506,7 @@ class The_Reformer(Card):
     event_unique = True
 
     def use_event(self, game_instance, side: Side):
+        self.event_occurred = True
         reps = 6 if game_instance.vp_track > 0 else 4
         game_instance.input_state = Input(
             Side.USSR, InputType.SELECT_COUNTRY,
@@ -2661,6 +2662,8 @@ class Chernobyl(Card):
     event_unique = True
 
     def use_event(self, game_instance, side: Side):
+        self.event_occurred = True
+
         def add_chernobyl(effect_name: str):
             game_instance.basket[Side.US].append(effect_name)
             game_instance.end_turn_stage_list.append(
@@ -2676,7 +2679,7 @@ class Chernobyl(Card):
         }
 
         game_instance.input_state = Input(
-            side.opp, InputType.SELECT_MULTIPLE,
+            Side.US, InputType.SELECT_MULTIPLE,
             partial(game_instance.select_multiple_callback,
                     option_function_mapping),
             option_function_mapping.keys(),
@@ -2696,8 +2699,9 @@ class Latin_American_Debt_Crisis(Card):
 
     def use_event(self, game_instance, side: Side):
         def double_inf_ussr_callback(country_name: str) -> bool:
-            if game_instance.map[country_name].get_ussr_influence == 0:
+            if game_instance.map[country_name].influence[Side.USSR] == 0:
                 return False
+            game_instance.input_state.reps -= 1
             game_instance.map[country_name].influence[Side.USSR] *= 2
             return True
 
@@ -2795,6 +2799,7 @@ class Aldrich_Ames_Remix(Card):
     event_unique = True
 
     def use_event(self, game_instance, side: Side):
+        self.event_occurred = True
         game_instance.players[Side.USSR].update_opp_hand(
             game_instance.hand[Side.US])
         game_instance.input_state = Input(

@@ -1131,28 +1131,9 @@ class Game:
     def expand_deck(self):
 
         if self.turn_track == 1:
-            # TEST CODE BELOW -- remove when done
-            '''For testing early-war cards'''
-            self.hand[Side.USSR].extend([self.cards.early_war.pop(i)
-                                         for i in range(20)])
-            self.hand[Side.US].extend([self.cards.early_war.pop(0)
-                                       for i in range(19)])
-            '''For testing mid-war cards'''
-            self.hand[Side.US].extend([self.cards.mid_war.pop(i)
-                                       for i in range(24)])
-            self.hand[Side.USSR].extend([self.cards.mid_war.pop(0)
-                                         for i in range(24)])
-            '''For testing late-war cards'''
-            self.hand[Side.US].extend([self.cards.late_war.pop(i)
-                                       for i in range(12)])
-            self.hand[Side.USSR].extend([self.cards.late_war.pop(0)
-                                         for i in range(11)])
-            # TEST CODE ABOVE -- remove when done
             self.draw_pile.extend(self.cards.early_war)
-            # # WORKING CODE BELOW -- uncomment if not using test code
-            # self.hand[Side.USSR].append(self.draw_pile.pop(
-            #     self.draw_pile.index('The_China_Card')))
-            # # WORKING CODE ABOVE -- uncomment if not using test code
+            self.hand[Side.USSR].append(self.draw_pile.pop(
+                self.draw_pile.index('The_China_Card')))
             self.cards.early_war = []
             self.shuffle_draw_pile_stage()
         elif self.turn_track == 4:
@@ -1167,11 +1148,13 @@ class Game:
     def deal(self, first_side=Side.USSR):
 
         if first_side == Side.NEUTRAL:
-            handsize_target = [3, 2]
-        if 1 <= self.turn_track <= 3:
-            handsize_target = [8, 8]
+            handsize_target = [len(self.hand[Side.USSR]),
+                               len(self.hand[Side.US]),
+                               len(self.hand[Side.NEUTRAL]) + 5]
+        elif 1 <= self.turn_track <= 3:
+            handsize_target = [8, 8, len(self.hand[Side.NEUTRAL])]
         else:
-            handsize_target = [9, 9]
+            handsize_target = [9, 9, len(self.hand[Side.NEUTRAL])]
 
         # Ignore China Card if it is in either hand
         if 'The_China_Card' in self.hand[Side.USSR]:
@@ -1207,11 +1190,13 @@ class Game:
             scoring_list = ['Asia_Scoring', 'Europe_Scoring', 'Middle_East_Scoring',
                             'Central_America_Scoring', 'Southeast_Asia_Scoring',
                             'Africa_Scoring', 'South_America_Scoring']
-            scoring_cards = [self.cards[y] for y in scoring_list]
-            if any(True for x in scoring_cards if x in self.hand[Side.US]):
+            if any(c in self.hand[Side.US] for c in scoring_list):
                 self.terminate(Side.USSR)
-            elif any(True for x in scoring_cards if x in self.hand[Side.USSR]):
+                return True
+            elif any(c in self.hand[Side.USSR] for c in scoring_list):
                 self.terminate(Side.US)
+                return True
+            return False
 
         # -1. Check if any player may discard held cards, also resets space turns
         def space_discard(self):
@@ -1256,13 +1241,8 @@ class Game:
 
         # 5. Final scoring (end T10)
         def final_scoring(self):
-            if self.turn_track == 10 and (self.ar_track in [15, 16, 17]):
-                self._Asia_Scoring()
-                self._Europe_Scoring()
-                self._Middle_East_Scoring()
-                self._Central_America_Scoring()
-                self._South_America_Scoring()
-                self._Africa_Scoring()
+            for region in MapRegion.main_regions():
+                self.score(region)
             for s in [Side.USSR, Side.US]:
                 if 'The_China_Card' in self.hand[s]:
                     self.change_vp(s.vp_mult)
@@ -1274,13 +1254,16 @@ class Game:
         # 8. Headline Phase
 
         # 9. Action Rounds (advance round marker) -- action rounds are not considered between turns
-        check_for_scoring_cards(self)
+        if check_for_scoring_cards(self):
+            return
         clear_baskets(self)
         space_discard(self)
         check_milops(self)
         flip_china_card(self)
+        if self.turn_track >= 10:
+            final_scoring(self)
+            return
         advance_turn_marker(self)  # turn marker advanced before final scoring
-        final_scoring(self)
         self.change_defcon(1)
         self.expand_deck()
         self.deal()  # turn marker advanced before dealing

@@ -513,8 +513,8 @@ dbg rollback                        Restores the state before debugging started.
                     self.game.input_state = input_state_rollback
                     print(f'\n=== {user_choice[1]} event complete. ===\n')
                 self.game.stage_list.append(end_of_event)
-                self.game.card_function_mapping[user_choice[1]](
-                    self.game, Side.fromStr(user_choice[2]))
+                self.game.trigger_event(Side.fromStr(user_choice[2]),
+                                        user_choice[1])
                 self.game_state_changed()
         elif user_choice[0] == 'rollback':
             print('Restoring pre-debugging state.')
